@@ -27,7 +27,10 @@ service cloud.firestore {
     }
     function secretShape() {
       return request.resource.data.keys().hasOnly(['password','setBy','setAt','resetByAdmin'])
-        && goodPassword(request.resource.data.password)
+        // 작성자가 정하는 비밀번호는 영문+숫자 6자 이상.
+        // 운영진이 정하는 기본 비밀번호(휴대전화 뒷자리 4자리)만 숫자 4자리를 허용.
+        && (goodPassword(request.resource.data.password)
+            || (isAdmin() && request.resource.data.password.matches('^[0-9]{4}$')))
         && request.resource.data.setBy == me()
         && request.resource.data.setAt == request.time
         && request.resource.data.resetByAdmin is bool;

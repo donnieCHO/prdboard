@@ -1,5 +1,5 @@
-import * as F from "./fb.js";
-import { $, $$, esc, timeAgo, toast } from "./util.js";
+import * as F from "./fb.js?v=00add4dc";
+import { $, $$, esc, timeAgo, toast } from "./util.js?v=00add4dc";
 
 const { enabled, P } = F;
 const PRDS = window.PRDS || [];
@@ -57,7 +57,7 @@ function renderTable() {
   <tbody>${PRDS.map(p => {
     const r = rows[p.id] || {}, s = r.secret, t = (r.prd && r.prd.team) || null;
     const pw = s ? (reveal[p.id] ? `<span class="mono">${esc(s.password)}</span>` : "••••••") : '<span class="hint">미설정</span>';
-    const set = s ? `${timeAgo(s.setAt)}${s.resetByAdmin ? " · 임시" : ""}<br><span class="hint mono" title="설정한 기기 ID">${esc((s.setBy || "").slice(0, 8))}</span>` : "";
+    const set = s ? `${timeAgo(s.setAt)}${s.resetByAdmin ? (/^[0-9]{4}$/.test(s.password) ? " · 기본(전화 뒷자리)" : " · 임시") : " · 작성자가 변경"}<br><span class="hint mono" title="설정한 기기 ID">${esc((s.setBy || "").slice(0, 8))}</span>` : "";
     const team = !r.prd ? '<span class="hint">초기 데이터 없음</span>'
       : `${teamLabel[t.status] || t.status} · ${1 + (t.members || []).length}/${t.capacity}${t.teamName ? `<br><span class="hint">${esc(t.teamName)}</span>` : ""}`;
     return `<tr>
@@ -124,6 +124,40 @@ async function seed() {
   } catch (e) { toast(F.isDenied(e) ? "권한이 없습니다." : "초기 데이터를 반영하지 못했습니다."); }
 }
 
+/* ---------- 기본 비밀번호 일괄 등록 ---------- */
+let pwData = null;
+async function readPwFile(file) {
+  pwData = null; $("#btnPwSeed").disabled = true;
+  try {
+    const j = JSON.parse(await file.text()), list = j.passwords || {};
+    const ok = Object.entries(list).filter(([id, v]) => PRDS.some(p => p.id === id) && /^[0-9]{4}$/.test(String(v.pw)));
+    if (!ok.length) throw new Error("empty");
+    pwData = ok;
+    $("#pwSeedMsg").textContent = `${ok.length}명의 기본 비밀번호를 읽었습니다. 「등록」을 누르면 저장합니다.`;
+    $("#btnPwSeed").disabled = false;
+  } catch { $("#pwSeedMsg").textContent = "파일을 읽지 못했습니다. default_passwords.json 파일인지 확인해 주세요."; }
+}
+async function seedPasswords() {
+  if (!pwData) return;
+  const overwrite = $("#pwOverwrite").checked;
+  if (!confirm(`${pwData.length}명의 기본 비밀번호를 등록할까요?${overwrite ? "\n작성자가 바꾼 비밀번호도 덮어씁니다." : "\n작성자가 직접 바꾼 비밀번호는 그대로 둡니다."}`)) return;
+  let done = 0, kept = 0, fail = 0;
+  for (const [id, v] of pwData) {
+    try {
+      const cur = await F.getDoc(P.secret(id));
+      if (cur.exists() && cur.data().resetByAdmin === false && !overwrite) { kept++; continue; }
+      const b = F.writeBatch(F.db);
+      b.set(P.secret(id), { password: String(v.pw), setBy: user.uid, setAt: F.serverTimestamp(), resetByAdmin: true });
+      b.update(P.prd(id), { passwordSet: true });
+      await b.commit(); done++;
+    } catch { fail++; }
+  }
+  await log("기본 비밀번호 일괄 등록", "-", `등록 ${done}, 유지 ${kept}, 실패 ${fail}`);
+  $("#pwSeedMsg").textContent = `등록 ${done}명, 작성자가 바꿔서 유지 ${kept}명${fail ? `, 실패 ${fail}명(초기 데이터가 없는 PRD일 수 있습니다)` : ""}.`;
+  pwData = null; $("#btnPwSeed").disabled = true; $("#pwFile").value = "";
+  loadAll(); loadLogs();
+}
+
 /* ---------- 덧글 관리 ---------- */
 async function loadComments() {
   const id = $("#cmtPrd").value, tbl = $("#cmtTbl");
@@ -177,6 +211,8 @@ function start() {
   $("#btnLogout").addEventListener("click", () => F.signOut(F.auth).then(() => location.reload()));
   $("#btnRefresh").addEventListener("click", () => { loadAll(); loadLogs(); });
   $("#btnSeed").addEventListener("click", seed);
+  $("#pwFile").addEventListener("change", e => { if (e.target.files[0]) readPwFile(e.target.files[0]); });
+  $("#btnPwSeed").addEventListener("click", seedPasswords);
   document.addEventListener("click", e => {
     const b = e.target.closest("[data-a]"); if (b) act(b.dataset.a, b.dataset.id);
     const c = e.target.closest("[data-c]"); if (c) commentAct(c.dataset.c, c.dataset.cid);

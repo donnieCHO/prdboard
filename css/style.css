@@ -7,7 +7,7 @@
   --page:#F4F6FB; --surface:#FFFFFF; --surface-2:#F7F8FC;
   --ink:#141A2E; --ink-2:#4A5270; --ink-3:#6E7695; --line:#DFE3EF; --line-strong:#141A2E;
   --red:#D93445; --green:#178A55; --violet:#6A45D8; --amber:#B86A00;
-  --field:#FFFFFF; --scrim:rgba(15,22,60,.55);
+  --field:#FFFFFF; --scrim:rgba(15,22,60,.55); --ring:rgba(46,64,166,.25);
   --shadow:0 1px 2px rgba(20,26,46,.06),0 8px 24px -14px rgba(20,26,46,.25);
 }
 @media (prefers-color-scheme:dark){
@@ -17,7 +17,7 @@
     --page:#0C1230; --surface:#141C45; --surface-2:#18214F;
     --ink:#EEF1FA; --ink-2:#C3CBE4; --ink-3:#97A2C7; --line:rgba(205,214,255,.16); --line-strong:#C9D2F2;
     --red:#FF7584; --green:#45D69A; --violet:#B79BFF; --amber:#FFC266;
-    --field:#0F1638; --scrim:rgba(4,8,26,.72);
+    --field:#0F1638; --scrim:rgba(4,8,26,.72); --ring:rgba(169,187,255,.35);
     --shadow:0 1px 0 rgba(255,255,255,.04) inset,0 10px 30px -16px rgba(0,0,0,.8);
   }
 }
@@ -33,7 +33,7 @@ a{color:var(--label)}
 
 /* ---------- 히어로: 포스터 상단 ---------- */
 .hero{position:relative;color:#fff;overflow:hidden;
-  background:url("../img/hero-bg.jpg") center/cover no-repeat,linear-gradient(135deg,#2B3C9F,#3550B8 60%,#5A7FD8)}
+  background:url("../img/hero-bg.jpg?v=00add4dc") center/cover no-repeat,linear-gradient(135deg,#2B3C9F,#3550B8 60%,#5A7FD8)}
 .hero::after{content:"";position:absolute;inset:auto 0 0 0;height:1px;background:rgba(255,255,255,.18)}
 @media (prefers-color-scheme:dark){.hero{background-color:#1E2B7E}.hero::before{content:"";position:absolute;inset:0;background:rgba(6,10,40,.28)}}
 .hero-in{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:34px 20px 48px}
@@ -44,13 +44,14 @@ a{color:var(--label)}
 .hero .lead{font-size:clamp(17px,2.1vw,21px);font-weight:500;line-height:1.6;margin:22px 0 0;max-width:30em;opacity:.95}
 
 /* 포스터의 연결된 단계 상자: PRD를 쓰는 순서 */
-.flow{list-style:none;display:flex;align-items:center;gap:0;padding:0;margin:36px 0 0;flex-wrap:wrap;row-gap:14px}
-.flow li{display:flex;align-items:center}
-.flow .box{border:1.5px solid rgba(255,255,255,.9);border-radius:10px;padding:10px 16px 12px;min-width:118px;background:rgba(255,255,255,.04)}
+.flow{list-style:none;display:flex;align-items:center;gap:0;padding:4px 2px 18px;margin:32px -2px 0;flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.4) transparent}
+.flow::-webkit-scrollbar{height:6px}.flow::-webkit-scrollbar-thumb{background:rgba(255,255,255,.35);border-radius:3px}
+.flow li{display:flex;align-items:center;flex:0 0 auto;scroll-snap-align:start}
+.flow .box{border:1.5px solid rgba(255,255,255,.9);border-radius:10px;padding:10px 16px 12px;min-width:118px;background:rgba(255,255,255,.04);white-space:nowrap}
 .flow .box small{display:block;font-size:12.5px;font-weight:700;opacity:.85;border-bottom:1px solid rgba(255,255,255,.55);padding-bottom:6px;margin-bottom:6px}
 .flow .box span{font-size:15px;font-weight:700}
 .flow li:nth-child(even) .box{transform:translateY(12px)}
-.flow .link{width:34px;height:2px;background:rgba(255,255,255,.85);position:relative;margin:0 2px}
+.flow .link{flex:0 0 auto;width:34px;height:2px;background:rgba(255,255,255,.85);position:relative;margin:0 6px}
 .flow .link::before,.flow .link::after{content:"";position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #3550B8}
 .flow .link::before{left:-5px}.flow .link::after{right:-5px}
 .flow .goal .box{background:var(--lime);border-color:var(--lime);color:var(--lime-ink)}
@@ -65,9 +66,17 @@ a{color:var(--label)}
 .notice{max-width:1180px;margin:0 auto;padding:12px 20px;font-size:14px;color:var(--ink-2)}
 .hero .notice{padding:12px 16px;margin-top:16px;border-radius:10px;background:rgba(255,255,255,.14);color:#fff;border:0}
 
+.author-guide{margin:18px 0 0;font-size:14.5px;line-height:1.6;max-width:44em;padding:12px 16px;border-radius:10px;border:1px dashed rgba(255,255,255,.6);background:rgba(255,255,255,.06)}
+.author-guide b{color:var(--lime);margin-right:6px}
+.pw-guide{margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--cobalt-soft);border-left:4px solid var(--cobalt);font-size:14px}
+.pw-guide p{margin:2px 0}
+.pw-nudge{background:var(--cobalt-soft);border-color:var(--cobalt);font-size:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+@media (prefers-color-scheme:dark){.pw-guide{border-left-color:var(--lime)}}
+
 /* ---------- 정보 띠 = 대상별 보기 (포스터의 일정·장소·대상 줄) ---------- */
-.infobar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--surface) 94%,transparent);
+.infobar{position:sticky;top:0;z-index:30;background:var(--surface);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+@supports (background:color-mix(in srgb,red 50%,transparent)){.infobar{background:color-mix(in srgb,var(--surface) 94%,transparent)}}
 .infobar-in{max-width:1180px;margin:0 auto;padding:0 20px;display:flex;align-items:stretch;gap:16px}
 .filters{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;flex:1 1 auto;max-width:640px}
 .filters button{border:0;background:none;text-align:left;cursor:pointer;padding:14px 14px 13px 0;display:grid;gap:2px}
@@ -79,7 +88,7 @@ a{color:var(--label)}
 .find{flex:0 1 320px;display:flex;align-items:center;gap:8px;margin:12px 0;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--field);color:var(--ink-2)}
 .find input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:15px;color:var(--ink);padding:10px 0}
 .find input:focus{outline:none}
-.find:focus-within{border-color:var(--cobalt);box-shadow:0 0 0 3px color-mix(in srgb,var(--cobalt) 25%,transparent)}
+.find:focus-within{border-color:var(--cobalt);box-shadow:0 0 0 3px var(--ring)}
 .find input::placeholder{color:var(--ink-3)}
 
 /* ---------- 카드 ---------- */
@@ -113,7 +122,7 @@ main{max-width:1180px;margin:0 auto;padding:22px 20px 70px}
   font-size:13.5px;font-weight:700;padding:6px 12px;border-radius:8px;color:var(--ink)}
 .chipbtn svg{width:16px;height:16px}
 .chipbtn:hover{border-color:var(--ink-3)}
-.chipbtn.liked{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,transparent)}
+.chipbtn.liked{color:var(--red);border-color:var(--red)}
 .chipbtn.liked svg{fill:currentColor}
 .chipbtn:disabled{cursor:default;opacity:.6}
 .chipbtn em{font-style:normal;font-size:12px;font-weight:800}
@@ -135,7 +144,7 @@ main{max-width:1180px;margin:0 auto;padding:22px 20px 70px}
 @keyframes up{from{transform:translate(-50%,60%)}to{transform:translate(-50%,0)}}
 .grab{display:none}
 .bar{display:flex;align-items:center;gap:10px 12px;flex-wrap:wrap;padding:18px 18px 0 24px;flex:0 0 auto;color:#fff;
-  background:url("../img/hero-bg.jpg") center/cover,linear-gradient(135deg,#2B3C9F,#3550B8)}
+  background:url("../img/hero-bg.jpg?v=00add4dc") center/cover,linear-gradient(135deg,#2B3C9F,#3550B8)}
 .bar .t{flex:1;min-width:180px;padding-bottom:6px}
 .bar .t b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar .t span{font-size:13.5px;font-weight:600;opacity:.88}
@@ -184,14 +193,14 @@ main{max-width:1180px;margin:0 auto;padding:22px 20px 70px}
 .row > *{flex:1 1 140px}
 .in{width:100%;border:1px solid var(--line);background:var(--field);color:var(--ink);font:inherit;font-size:15px;padding:11px 14px;border-radius:10px}
 textarea.in{min-height:84px;resize:vertical;line-height:1.55}
-.in:focus{outline:none;border-color:var(--cobalt);box-shadow:0 0 0 3px color-mix(in srgb,var(--cobalt) 22%,transparent)}
+.in:focus{outline:none;border-color:var(--cobalt);box-shadow:0 0 0 3px var(--ring)}
 .in::placeholder{color:var(--ink-3)}
 .actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
 .btn{border:1px solid var(--line);cursor:pointer;font-size:14px;font-weight:700;padding:10px 16px;border-radius:9px;background:var(--surface);color:var(--ink)}
 .btn:hover{border-color:var(--ink-3)}
 .btn.primary{background:var(--cobalt);border-color:var(--cobalt);color:#fff}
 .btn.primary:hover{background:var(--cobalt-deep)}
-.btn.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,transparent)}
+.btn.danger{color:var(--red);border-color:var(--red)}
 .btn.small{font-size:13px;padding:6px 12px}
 .btn:disabled{opacity:.45;cursor:default}
 .hint{font-size:14px;color:var(--ink-2);margin:0}
@@ -248,7 +257,7 @@ details.box summary{cursor:pointer}
 .app .info span{font-size:13px;color:var(--label);font-weight:700;margin-left:6px}
 .app .info p{margin:2px 0 0;font-size:13.5px;color:var(--ink-2)}
 .sel{font-size:12.5px;font-weight:800;color:var(--label)}
-.author-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:var(--cobalt-soft);border:1px solid color-mix(in srgb,var(--cobalt) 35%,transparent);margin:18px 0}
+.author-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:var(--cobalt-soft);border:1px solid var(--cobalt);margin:18px 0}
 .author-bar b{font-size:14px}
 
 /* 알림 */
@@ -273,7 +282,7 @@ details.box summary{cursor:pointer}
 .tbl th{font-size:13px;color:var(--label);border-bottom:1.5px solid var(--line-strong)}
 .tbl-wrap{overflow-x:auto}
 .mono{font-family:"D2Coding",Consolas,Menlo,monospace}
-.admin-top{background:url("../img/hero-bg.jpg") center/cover,linear-gradient(135deg,#2B3C9F,#3550B8);color:#fff}
+.admin-top{background:url("../img/hero-bg.jpg?v=00add4dc") center/cover,linear-gradient(135deg,#2B3C9F,#3550B8);color:#fff}
 .admin-top .admin{padding-bottom:28px}
 .admin-top .hint,.admin-top a{color:#fff}
 
@@ -284,9 +293,21 @@ details.box summary{cursor:pointer}
   .filters button{padding:12px 6px 11px 0}
   .filters button b{font-size:17px}
   .find{flex:1 1 auto;margin:0 0 12px}
-  .flow .link{width:18px}
-  .flow .box{min-width:0;padding:8px 12px 10px}
+  /* 좁은 화면: 단계 상자를 세로로 쌓고 연결선도 세로로 */
+  .flow{flex-direction:column;align-items:stretch;overflow:visible;padding:0;margin-top:26px}
+  .flow li{flex-direction:column;align-items:stretch}
   .flow li:nth-child(even) .box{transform:none}
+  .flow .box{display:flex;align-items:center;gap:12px;min-width:0;padding:10px 14px;white-space:normal}
+  .flow .box small{flex:0 0 64px;border-bottom:0;border-right:1px solid rgba(255,255,255,.55);padding:0 10px 0 0;margin:0}
+  .flow .goal .box small{border-color:rgba(30,42,0,.35)}
+  .flow .box span{font-size:14.5px}
+  .flow .link{width:2px;height:24px;margin:0 0 0 30px}
+  .flow .link::before,.flow .link::after{left:-4px;width:8px;height:8px;border-width:2px}
+  .flow .link::before{top:-4px}.flow .link::after{top:auto;bottom:-4px;right:auto}
+  .hero-in{padding:22px 16px 34px}
+  .topline{font-size:12.5px}
+  .tag{margin-top:24px}
+  .hero-row{margin-top:26px}
   .sheet{top:8px}
   .paper{padding:24px 18px 70px}
   .replies{margin-left:4px;padding-left:12px}

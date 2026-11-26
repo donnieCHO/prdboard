@@ -6,9 +6,9 @@
 <meta name="robots" content="noindex, nofollow">
 <title>제출함 관리</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="css/style.css">
-<script src="data/prds.js"></script>
-<script type="module" src="js/admin.js"></script>
+<link rel="stylesheet" href="css/style.css?v=00add4dc">
+<script src="data/prds.js?v=00add4dc"></script>
+<script type="module" src="js/admin.js?v=00add4dc"></script>
 </head>
 <body>
 <header class="admin-top">
@@ -41,6 +41,17 @@
     </section>
 
     <section class="panel glass">
+      <h2 class="sec-title">기본 비밀번호 일괄 등록</h2>
+      <p class="hint">연수 신청서의 휴대전화 번호 뒷자리 4자리를 작성자 기본 비밀번호로 등록합니다. 운영진 컴퓨터에 있는 <b>default_passwords.json</b> 파일을 고릅니다. 이 파일은 GitHub에 올리지 않습니다.</p>
+      <div class="actions" style="justify-content:flex-start;margin-top:12px">
+        <input type="file" id="pwFile" accept=".json,application/json" class="in" style="max-width:360px">
+        <label class="hint"><input type="checkbox" id="pwOverwrite"> 작성자가 이미 바꾼 비밀번호도 덮어쓰기</label>
+        <button class="btn primary" id="btnPwSeed" disabled>등록</button>
+      </div>
+      <p class="hint" id="pwSeedMsg" style="margin-top:10px"></p>
+    </section>
+
+    <section class="panel glass">
       <h2 class="sec-title">덧글 관리</h2>
       <div class="row" style="max-width:520px">
         <select class="in" id="cmtPrd" aria-label="PRD 고르기"></select>
@@ -57,8 +68,8 @@
 <footer class="foot">
   <div class="foot-in">
     <picture>
-      <source srcset="img/logo-dark.png" media="(prefers-color-scheme: dark)">
-      <img src="img/logo-light.png" alt="전남광주통합특별시교육청 전남창의융합교육원" width="250" height="46">
+      <source srcset="img/logo-dark.png?v=00add4dc" media="(prefers-color-scheme: dark)">
+      <img src="img/logo-light.png?v=00add4dc" alt="전남광주통합특별시교육청 전남창의융합교육원" width="250" height="46">
     </picture>
     <div class="foot-txt"><p><b>2026 AI·디지털 교육혁신 교원 해커톤 연계 연수</b></p><p>PRD 과제 제출함 운영진 화면</p></div>
   </div>

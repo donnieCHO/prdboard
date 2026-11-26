@@ -1,5 +1,5 @@
-import * as F from "./fb.js";
-import { $, $$, esc, store, timeAgo, toast, goodPassword, ICON } from "./util.js";
+import * as F from "./fb.js?v=00add4dc";
+import { $, $$, esc, store, timeAgo, toast, goodPassword, ICON } from "./util.js?v=00add4dc";
 
 const { enabled, P } = F;
 const PRDS = window.PRDS || [];
@@ -14,7 +14,7 @@ const S = {
   replyFor: null,     // {root, to:{name,org}|null}
   editing: null,      // 수정 중인 덧글 id
   applyOpen: false, applyEdit: false, pwChange: false,
-  draft: {}, docCache: {}, busy: false,
+  draft: {}, docCache: {}, busy: false, usedDefault: {},
 };
 
 const me = () => store.get("prd.me", { org: "", name: "" });
@@ -133,7 +133,7 @@ async function openDoc(id, tab = "doc") {
 async function loadDoc(id) {
   try {
     if (!S.docCache[id]) {
-      const r = await fetch(`docs/${id}.html`);
+      const r = await fetch(`docs/${id}.html?v=00add4dc`);
       if (!r.ok) throw new Error(r.status);
       S.docCache[id] = await r.text();
     }
@@ -380,6 +380,7 @@ function renderTeam() {
       finalized: `<button class="btn" data-act="reopen">다시 열기</button>`,
     }[t.status];
     authorBlock = `<div class="author-bar"><b>작성자로 확인되었습니다.</b>${ctl}</div>
+      ${S.usedDefault[id] && !S.pwChange ? `<div class="box pw-nudge"><b>휴대전화 뒷자리로 들어오셨습니다.</b> 다른 사람이 짐작할 수 있으니 영문과 숫자를 섞은 비밀번호로 바꿔 주세요. <button class="btn small primary" data-act="pw-toggle">지금 바꾸기</button></div>` : ""}
       <div class="actions" style="justify-content:flex-start">
         <button class="btn small" data-act="pw-toggle">비밀번호 변경</button>
         <button class="btn small" data-act="author-out">이 기기에서 작성자 확인 해제</button>
@@ -396,9 +397,13 @@ function renderTeam() {
         <input class="in" type="password" data-f="pw2" placeholder="비밀번호 확인" autocomplete="new-password" aria-label="비밀번호 확인"></div>
         <div class="actions"><button class="btn primary" type="submit">비밀번호 설정</button></div></form></details>`;
   } else {
-    authorBlock = `<details class="box"><summary><b>작성자이신가요?</b></summary>
-      <form class="form" data-kind="pw-verify" style="margin-top:12px"><input class="in" type="password" data-f="pw" placeholder="작성자 비밀번호" autocomplete="current-password" aria-label="작성자 비밀번호">
-        <div class="actions"><span class="counter">비밀번호를 잊으셨다면 연수 운영진에게 초기화를 요청해 주세요.</span><button class="btn primary" type="submit">작성자 확인</button></div></form></details>`;
+    authorBlock = `<details class="box author-entry" open><summary><b>이 PRD를 쓰신 ${esc(info.name)} 선생님이신가요?</b></summary>
+      <div class="pw-guide">
+        <p><b>처음 비밀번호는 연수 신청 때 적은 휴대전화 번호 뒷자리 4자리</b>입니다. 예: 010-1234-<b>5678</b> → <b>5678</b></p>
+        <p>작성자 확인을 마치면 다른 사람이 알 수 없는 비밀번호로 바꿔 주세요.</p>
+      </div>
+      <form class="form" data-kind="pw-verify" style="margin-top:12px"><input class="in" type="password" data-f="pw" inputmode="numeric" placeholder="휴대전화 뒷자리 4자리 또는 바꾼 비밀번호" autocomplete="current-password" aria-label="작성자 비밀번호">
+        <div class="actions"><span class="counter">확인이 안 되면 연수 운영진에게 초기화를 요청해 주세요.</span><button class="btn primary" type="submit">작성자 확인</button></div></form></details>`;
   }
 
   pane.innerHTML = `
@@ -483,13 +488,14 @@ async function submitPw(kindName, form) {
       S.author[id] = true; toast("비밀번호를 설정했습니다. 이제 팀 만들기를 활성화할 수 있습니다.");
     } else if (kindName === "pw-verify") {
       await F.setDoc(P.key(id, S.uid), { password: pw, at: F.serverTimestamp() });
-      S.author[id] = true; toast("작성자로 확인되었습니다.");
+      S.author[id] = true; S.usedDefault[id] = /^[0-9]{4}$/.test(pw);
+      toast(S.usedDefault[id] ? "작성자로 확인되었습니다. 비밀번호를 바꿔 주세요." : "작성자로 확인되었습니다.");
     } else {
       const b = F.writeBatch(F.db);
       b.update(P.secret(id), { password: pw, setBy: S.uid, setAt: F.serverTimestamp(), resetByAdmin: false });
       b.set(P.key(id, S.uid), { password: pw, at: F.serverTimestamp() });
       await b.commit();
-      S.pwChange = false; toast("비밀번호를 바꿨습니다.");
+      S.pwChange = false; S.usedDefault[id] = false; toast("비밀번호를 바꿨습니다.");
     }
     renderTeam(); renderComments();
   } catch (e) {
