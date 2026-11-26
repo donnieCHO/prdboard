@@ -1,0 +1,155 @@
+rules_version = '2';
+// PRD 과제 제출함 보안 규칙 (firebase_db_design.md v0.3 기준)
+// Firebase 콘솔 > Firestore Database > 규칙 탭에 전체를 붙여 넣고 "게시"합니다.
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // ---------- 공통 함수 ----------
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(db)/documents/admins/$(me()));
+    }
+    function secretPath(p) { return /databases/$(db)/documents/secrets/$(p); }
+    function keyPath(p, uid) { return /databases/$(db)/documents/prds/$(p)/authorKeys/$(uid); }
+    function isAuthor(p) {
+      return signedIn()
+        && exists(secretPath(p)) && exists(keyPath(p, me()))
+        && get(keyPath(p, me())).data.password == get(secretPath(p)).data.password;
+    }
+    function prd(p) { return get(/databases/$(db)/documents/prds/$(p)).data; }
+    function str(v, lo, hi) { return v is string && v.size() >= lo && v.size() <= hi; }
+    function goodPassword(v) {
+      return str(v, 6, 30) && v.matches('.*[A-Za-z].*') && v.matches('.*[0-9].*');
+    }
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function secretShape() {
+      return request.resource.data.keys().hasOnly(['password','setBy','setAt','resetByAdmin'])
+        && goodPassword(request.resource.data.password)
+        && request.resource.data.setBy == me()
+        && request.resource.data.setAt == request.time
+        && request.resource.data.resetByAdmin is bool;
+    }
+
+    // ---------- 관리자 명단: 콘솔에서만 수정 ----------
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- 작성자 비밀번호 ----------
+    match /secrets/{p} {
+      allow read: if isAdmin();
+      // create는 문서가 없을 때만 실행됨 → 작성자의 "처음 설정" 또는 관리자의 임시 비밀번호 발급
+      allow create: if secretShape()
+        && (isAdmin() || request.resource.data.resetByAdmin == false);
+      // 작성자는 자기 비밀번호 변경, 관리자는 임시 비밀번호로 교체
+      allow update: if secretShape()
+        && (isAdmin() || (isAuthor(p) && request.resource.data.resetByAdmin == false));
+      allow delete: if isAdmin();
+    }
+
+    // ---------- PRD ----------
+    match /prds/{p} {
+      function validTeam() {
+        let t = request.resource.data.team;
+        return t.keys().hasOnly(['status','capacity','members','teamName','activatedAt','finalizedAt'])
+          && t.status in ['closed','open','finalized']
+          && t.capacity == resource.data.team.capacity
+          && t.members is list && t.members.size() <= t.capacity - 1   // 작성자 자리 1개 제외
+          && (!('teamName' in t) || str(t.teamName, 0, 30));
+      }
+
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        // 처음 비밀번호를 설정하는 배치에서 passwordSet만 true로
+        || (signedIn() && onlyChanged(['passwordSet'])
+            && request.resource.data.passwordSet == true
+            && existsAfter(secretPath(p)))
+        // 작성자는 team만 바꿀 수 있고, 정원은 못 바꿈
+        || (isAuthor(p) && onlyChanged(['team']) && validTeam());
+
+      // ----- 작성자 증표 -----
+      match /authorKeys/{uid} {
+        allow read: if isAdmin() || (signedIn() && me() == uid);
+        // getAfter: 처음 설정·비밀번호 변경 배치에서 secrets와 함께 써도 통과
+        allow create, update: if signedIn() && me() == uid
+          && request.resource.data.keys().hasOnly(['password','at'])
+          && request.resource.data.at == request.time
+          && existsAfter(secretPath(p))
+          && request.resource.data.password == getAfter(secretPath(p)).data.password;
+        allow delete: if isAdmin() || (signedIn() && me() == uid);
+      }
+
+      // ----- 좋아요 -----
+      match /likes/{uid} {
+        allow read: if true;
+        allow create: if signedIn() && me() == uid
+          && request.resource.data.keys().hasOnly(['at'])
+          && request.resource.data.at == request.time;
+        allow delete: if signedIn() && me() == uid;
+        allow update: if false;
+      }
+
+      // ----- 덧글·답글 (2단계) -----
+      match /comments/{c} {
+        function commentPath(cid) { return /databases/$(db)/documents/prds/$(p)/comments/$(cid); }
+        function validNew(d) {
+          return d.keys().hasOnly(['parentId','depth','replyTo','uid','org','name','body',
+                                   'status','createdAt','editedAt','isPrdAuthor'])
+            && d.uid == me()
+            && str(d.org, 1, 30) && str(d.name, 1, 20) && str(d.body, 1, 500)
+            && d.status == 'visible'
+            && d.createdAt == request.time && d.editedAt == null
+            && d.isPrdAuthor == isAuthor(p)
+            && (d.replyTo == null || (d.replyTo is map && d.replyTo.keys().hasOnly(['name','org'])
+                                      && str(d.replyTo.name, 1, 20)))
+            && ( (d.parentId == null && d.depth == 0 && d.replyTo == null)
+              || (d.depth == 1 && d.parentId is string
+                  && exists(commentPath(d.parentId))
+                  && get(commentPath(d.parentId)).data.depth == 0) );
+        }
+
+        allow read: if true;
+        allow create: if signedIn() && validNew(request.resource.data);
+        allow update: if
+          // 본인: 내용 수정
+          (signedIn() && resource.data.uid == me() && resource.data.status == 'visible'
+            && onlyChanged(['body','editedAt'])
+            && str(request.resource.data.body, 1, 500)
+            && request.resource.data.editedAt == request.time)
+          // 본인: 삭제(소프트)
+          || (signedIn() && resource.data.uid == me()
+            && onlyChanged(['status','body'])
+            && request.resource.data.status == 'deleted' && request.resource.data.body == '')
+          // PRD 작성자·관리자: 숨김/복원
+          || ((isAdmin() || isAuthor(p)) && onlyChanged(['status'])
+            && request.resource.data.status in ['visible','hidden']);
+        allow delete: if isAdmin();
+      }
+
+      // ----- 팀 참여 신청 -----
+      match /applications/{uid} {
+        allow read: if true;
+        allow create, update: if signedIn() && me() == uid
+          && prd(p).team.status == 'open'
+          && request.resource.data.keys().hasOnly(['org','name','note','at'])
+          && str(request.resource.data.org, 1, 30)
+          && str(request.resource.data.name, 1, 20)
+          && (!('note' in request.resource.data) || str(request.resource.data.note, 0, 100))
+          && request.resource.data.at == request.time;
+        allow delete: if isAdmin() || isAuthor(p)
+          || (signedIn() && me() == uid && prd(p).team.status == 'open');
+      }
+    }
+
+    // ---------- 관리자 작업 기록 ----------
+    match /adminLogs/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}
