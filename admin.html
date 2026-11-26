@@ -5,16 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>제출함 관리</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="css/style.css">
 <script src="data/prds.js"></script>
 <script type="module" src="js/admin.js"></script>
 </head>
 <body>
-<div class="wall" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+<header class="admin-top">
+  <div class="admin">
+    <p class="tag" style="margin:0 0 10px"><b>운영진</b>PRD 과제 제출함</p>
+    <h1>제출함 관리</h1>
+    <p class="hint">작성자 비밀번호, 팀 만들기, 덧글을 관리합니다. <a href="index.html">제출함으로 돌아가기</a></p>
+  </div>
+</header>
 <div class="admin">
-  <h1>제출함 관리</h1>
-  <p class="hint">PRD 과제 제출함의 작성자 비밀번호, 팀 만들기, 덧글을 관리합니다. <a href="index.html">제출함으로 돌아가기</a></p>
-
   <section class="panel glass" id="login">
     <p id="loginMsg" class="hint">관리자 Google 계정으로 로그인합니다.</p>
     <div class="actions" style="justify-content:flex-start;margin-top:12px">
@@ -50,5 +54,14 @@
     </section>
   </div>
 </div>
+<footer class="foot">
+  <div class="foot-in">
+    <picture>
+      <source srcset="img/logo-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="img/logo-light.png" alt="전남광주통합특별시교육청 전남창의융합교육원" width="250" height="46">
+    </picture>
+    <div class="foot-txt"><p><b>2026 AI·디지털 교육혁신 교원 해커톤 연계 연수</b></p><p>PRD 과제 제출함 운영진 화면</p></div>
+  </div>
+</footer>
 </body>
 </html>

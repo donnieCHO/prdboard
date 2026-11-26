@@ -17,7 +17,8 @@
 | `admin.html` | 관리자 화면: 초기 데이터, 비밀번호 보기·임시 발급, 팀 초기화·정원, 덧글 관리, 작업 기록 |
 | `docs/prd01~17.html` | PRD 원문. 열 때만 불러옵니다 |
 | `data/prds.js` | 카드 요약(소속, 이름, 컨셉, 대상, 특징). 자동 생성 파일 |
-| `css/style.css` | Liquid Glass 화면 디자인 |
+| `css/style.css` | 화면 디자인 (연수 포스터의 코발트·라임 디자인, 다크 모드 대응) |
+| `img/` | 기관 로고(밝은 화면용·어두운 화면용), 상단 배경 이미지 |
 | `js/firebase-config.js` | **Firebase 설정값을 넣는 파일** (배포 전에 꼭 채움) |
 | `js/fb.js`, `js/app.js`, `js/admin.js`, `js/util.js` | 화면 동작 |
 | `firestore.rules` | Firestore 보안 규칙 (정본) |

@@ -28,12 +28,12 @@ const teamOf = id => {
 const len = (s, lo, hi) => s.length >= lo && s.length <= hi;
 
 /* ---------------- 카드 ---------------- */
-function teamChip(id) {
-  if (!S.prd[id]) return "";
-  const t = teamOf(id);
-  if (t.status === "open") return `<span class="teamchip open">팀 모집 중 ${1 + t.members.length}/${t.capacity}</span>`;
-  if (t.status === "finalized") return `<span class="teamchip finalized">팀 확정</span>`;
-  return "";
+function teamBtn(id) {
+  const t = teamOf(id), n = 1 + t.members.length;
+  const st = S.prd[id] ? t.status : "none";
+  const word = { open: "모집 중", finalized: "확정", closed: "", none: "" }[st];
+  const label = { open: "팀 모집 중", finalized: "팀 확정", closed: "팀 모집 전", none: "팀" }[st];
+  return `<button class="chipbtn team ${st}" data-open="${id}" data-tab="team" aria-label="${label}, ${n}/${t.capacity}명. 팀 구성 보기">${ICON.team}<span>${n}/${t.capacity}</span>${word ? `<em>${word}</em>` : ""}</button>`;
 }
 function likeBtn(id, cls = "") {
   const n = S.likeCount[id] ?? 0, on = !!S.myLike[id];
@@ -55,7 +55,7 @@ function renderCards() {
       <div class="stats">
         ${likeBtn(d.id)}
         <button class="chipbtn" data-open="${d.id}" data-tab="comments" aria-label="덧글 보기">${ICON.chat}<span>${S.commentCount[d.id] ?? 0}</span></button>
-        ${teamChip(d.id)}
+        ${teamBtn(d.id)}
       </div>
       <button class="open" data-open="${d.id}" data-tab="doc">전체 PRD 문서 보기</button>
     </article>`).join("") : '<p class="empty glass">찾는 과제가 없습니다. 다른 낱말로 찾아보세요.</p>';
@@ -98,11 +98,12 @@ async function loadCounts() {
 /* ---------------- 원문 시트 ---------------- */
 async function openDoc(id, tab = "doc") {
   const d = byId[id]; if (!d) return;
-  S.openId = id; S.replyFor = null; S.editing = null; S.applyOpen = false; S.applyEdit = false; S.pwChange = false; S.comments = []; S.apps = [];
+  S.openId = id; S.replyFor = null; S.editing = null; S.applyOpen = false; S.applyEdit = false; S.pwChange = false; S.comments = []; S.apps = []; S.appsLoaded = false;
   $("#vtitle").textContent = d.title;
   $("#vwho").textContent = `${d.org} ${d.name}`;
   $("#vlike").outerHTML = likeBtn(id).replace("<button", '<button id="vlike"');
   $("#tabComments").textContent = `덧글 ${S.commentCount[id] ?? 0}`;
+  paintTeamTab();
   $("#vdoc").innerHTML = '<p class="hint">원문을 불러오는 중입니다.</p>';
   $("#viewer").classList.add("on"); $("#viewer").setAttribute("aria-hidden", "false");
   document.body.style.overflow = "hidden";
@@ -124,6 +125,7 @@ async function openDoc(id, tab = "doc") {
   }, () => {}));
   S.unsub.push(F.onSnapshot(F.query(P.apps(id), F.orderBy("at")), snap => {
     S.apps = snap.docs.map(x => ({ id: x.id, ...x.data({ serverTimestamps: "estimate" }) }));
+    S.appsLoaded = true;
     renderTeam();
   }, () => {}));
   renderComments(); renderTeam();
@@ -285,34 +287,68 @@ async function saveEdit(form) {
   } catch { toast("수정하지 못했습니다."); }
 }
 
-/* ---------------- 팀 ---------------- */
+/* ---------------- 팀 ----------------
+   규칙: 1번 자리는 PRD 작성자(고정). 다른 교사는 신청만 하고,
+   작성자가 신청자 중 (정원-1)명 = 기본 2명을 골라 총 3명이 되면 확정할 수 있다. */
+function paintTeamTab() {
+  const b = $("#tabTeam"); if (!b || !S.openId) return;
+  const t = teamOf(S.openId);
+  b.textContent = S.prd[S.openId] ? `팀 ${1 + t.members.length}/${t.capacity}` : "팀";
+}
+function teamStep(t) {
+  const slots = t.capacity - 1;
+  if (t.status === "finalized") return 4;
+  if (t.status === "open") return t.members.length >= slots ? 3 : 2;
+  return 1;
+}
 function renderTeam() {
   const pane = $("#pane-team"), id = S.openId; if (!id) return;
   if (!enabled) { pane.innerHTML = '<h3 class="sec-title">팀 만들기</h3><p class="hint">팀 만들기 기능은 아직 연결 전입니다.</p>'; return; }
   if (!S.prd[id]) { pane.innerHTML = '<h3 class="sec-title">팀 만들기</h3><p class="hint">운영진이 초기 설정을 마치면 팀 만들기를 쓸 수 있습니다.</p>'; return; }
   const info = byId[id], prd = S.prd[id], t = teamOf(id), author = !!S.author[id];
   const slots = t.capacity - 1, left = Math.max(0, slots - t.members.length);
+  const seatNo = uid => t.members.findIndex(m => m.uid === uid) + 2;   // 선정 순서대로 2번, 3번
   const isSel = uid => t.members.some(m => m.uid === uid);
   const mine = S.apps.find(a => a.id === S.uid);
+  const step = teamStep(t);
 
-  const seats = [`<div class="seat filled"><small>작성자</small><b>${esc(info.name)}</b> <span>${esc(info.org)}</span></div>`]
-    .concat(t.members.map(m => `<div class="seat filled"><small>팀원</small><b>${esc(m.name)}</b> <span>${esc(m.org)}</span></div>`))
-    .concat(Array.from({ length: left }, () => `<div class="seat"><small>빈자리</small></div>`)).join("");
+  // 진행 단계
+  const steps = [["모집 열기", "작성자"], [`팀원 ${slots}명 선정`, "작성자"], ["팀 확정", "작성자"]]
+    .map(([txt], i) => { const n = i + 1, cls = step > n ? "done" : step === n ? "now" : "";
+      return `<li class="${cls}"><span>${step > n ? "✓" : n}</span>${txt}</li>`; }).join("");
+
+  // 자리
+  const canApply = t.status === "open" && !author && !mine;
+  const seatHTML = [];
+  seatHTML.push(`<div class="seat filled owner"><span class="no">1</span><div><small>작성자</small><b>${esc(info.name)}</b> <span>${esc(info.org)}</span></div></div>`);
+  t.members.forEach((m, i) => {
+    const gone = S.appsLoaded && !S.apps.some(a => a.id === m.uid);
+    seatHTML.push(`<div class="seat filled"><span class="no">${i + 2}</span><div><small>팀원</small><b>${esc(m.name)}</b> <span>${esc(m.org)}</span>${gone ? '<em class="warn">신청을 취소했습니다</em>' : ""}</div></div>`);
+  });
+  for (let i = t.members.length; i < slots; i++) {
+    const body = canApply ? `<button class="btn small primary" data-act="apply-open">이 팀에 신청하기</button>`
+      : `<span>${t.status === "open" ? "작성자가 신청자 중에서 고릅니다" : "빈자리"}</span>`;
+    seatHTML.push(`<div class="seat"><span class="no">${i + 2}</span><div><small>팀원</small>${body}</div></div>`);
+  }
 
   const statusText = {
-    closed: "작성자가 아직 팀 모집을 열지 않았습니다.",
-    open: `팀원을 모집하고 있습니다. 작성자 포함 ${t.capacity}명 중 ${left}자리가 남았습니다. 신청은 여러 명이 할 수 있고, 작성자가 최종 ${slots}명을 고릅니다.`,
-    finalized: "팀 구성이 확정되었습니다.",
+    closed: author ? "아래에서 「팀 만들기 활성화」를 누르면 다른 선생님들이 신청할 수 있습니다." : "작성자가 아직 팀 모집을 열지 않았습니다.",
+    open: author
+      ? (left ? `신청자 중 ${left}명을 더 고르면 팀을 확정할 수 있습니다.` : "팀원을 모두 골랐습니다. 「팀 확정」을 누르면 팀이 완성됩니다.")
+      : `팀원을 모집하고 있습니다. 누구나 신청할 수 있고, 작성자가 신청자 중 ${slots}명을 골라 ${t.capacity}명 팀을 만듭니다.`,
+    finalized: `작성자를 포함한 ${1 + t.members.length}명으로 팀 구성이 확정되었습니다.`,
   }[t.status];
 
+  // 신청 영역
   let applyBlock = "";
-  if (t.status === "open") {
+  if (t.status === "open" && !author) {
     if (mine && !S.applyEdit) {
-      applyBlock = `<div class="box"><b>${isSel(S.uid) ? "팀원으로 선정되었습니다." : "참여 신청을 마쳤습니다. 작성자의 선정을 기다려 주세요."}</b>
+      applyBlock = `<div class="box"><b>${isSel(S.uid) ? `${seatNo(S.uid)}번 자리 팀원으로 선정되었습니다.` : "신청을 마쳤습니다. 작성자의 선정을 기다려 주세요."}</b>
         <div class="actions" style="justify-content:flex-start;margin-top:10px"><button class="btn small" data-act="apply-edit">신청 내용 수정</button><button class="btn small danger" data-act="apply-cancel">신청 취소</button></div></div>`;
     } else if (S.applyOpen || S.applyEdit) {
       const v = mine || me();
       applyBlock = `<form class="form" data-kind="apply" style="margin:16px 0">
+        <p class="hint" style="margin:0">소속과 이름을 적어 신청합니다. 작성자가 신청자 중에서 팀원을 고릅니다.</p>
         <div class="row">
           <input class="in" data-f="org" data-draft="apply-org" maxlength="30" placeholder="소속 (예: 동산초)" value="${esc(v.org || "")}" aria-label="소속">
           <input class="in" data-f="name" data-draft="apply-name" maxlength="20" placeholder="이름" value="${esc(v.name || "")}" aria-label="이름">
@@ -320,25 +356,27 @@ function renderTeam() {
         <input class="in" data-f="note" data-draft="apply-note" maxlength="100" placeholder="한마디 (선택, 100자 이내)" value="${esc(mine ? mine.note || "" : "")}" aria-label="한마디">
         <div class="actions"><button class="btn" type="button" data-act="apply-close">취소</button><button class="btn primary" type="submit">${mine ? "수정 저장" : "신청하기"}</button></div>
       </form>`;
-    } else if (!author) {
+    } else {
       applyBlock = `<button class="open" data-act="apply-open" style="width:100%;margin:16px 0">팀으로 참여하기</button>`;
     }
   }
 
+  // 신청자 목록
   const apps = t.status !== "closed" && S.apps.length ? `
-    <h4 style="margin:22px 0 6px">신청자 ${S.apps.length}명</h4>
+    <h4 style="margin:22px 0 6px">신청자 ${S.apps.length}명${author && t.status === "open" ? ` <span class="hint">· ${t.members.length}/${slots}명 선정</span>` : ""}</h4>
     <div class="apps">${S.apps.map(a => {
       const sel = isSel(a.id);
       const btn = author && t.status === "open"
-        ? `<button class="btn small ${sel ? "" : "primary"}" data-act="pick" data-uid="${a.id}" ${!sel && left === 0 ? "disabled" : ""}>${sel ? "선정 취소" : "선정"}</button>` : "";
-      return `<div class="app"><div class="info"><b>${esc(a.name)}</b><span>${esc(a.org)}</span>${a.note ? `<p>${esc(a.note)}</p>` : ""}</div>${sel ? '<span class="sel">선정</span>' : ""}${btn}</div>`;
-    }).join("")}</div>` : (t.status === "open" ? '<p class="hint">아직 신청자가 없습니다.</p>' : "");
+        ? `<button class="btn small ${sel ? "" : "primary"}" data-act="pick" data-uid="${a.id}" ${!sel && left === 0 ? "disabled" : ""}>${sel ? "선정 취소" : left === 0 ? "자리 없음" : `${t.members.length + 2}번 자리로 선정`}</button>` : "";
+      return `<div class="app ${sel ? "picked" : ""}"><div class="info"><b>${esc(a.name)}</b><span>${esc(a.org)}</span>${a.note ? `<p>${esc(a.note)}</p>` : ""}</div>${sel ? `<span class="sel">${seatNo(a.id)}번 자리</span>` : ""}${btn}</div>`;
+    }).join("")}</div>` : (t.status === "open" ? '<p class="hint" style="margin-top:14px">아직 신청자가 없습니다.</p>' : "");
 
+  // 작성자 영역
   let authorBlock;
   if (author) {
     const ctl = {
       closed: `<input class="in" data-f="teamName" data-draft="teamName" maxlength="30" placeholder="팀 이름 (선택)" value="${esc(t.teamName)}" style="flex:1 1 180px" aria-label="팀 이름"><button class="btn primary" data-act="activate">팀 만들기 활성화</button>`,
-      open: `<button class="btn primary" data-act="finalize">팀 확정</button><button class="btn" data-act="close">모집 닫기</button>`,
+      open: `<button class="btn primary" data-act="finalize" ${left ? "disabled" : ""}>팀 확정 (${t.members.length}/${slots}명 선정)</button><button class="btn" data-act="close">모집 닫기</button>`,
       finalized: `<button class="btn" data-act="reopen">다시 열기</button>`,
     }[t.status];
     authorBlock = `<div class="author-bar"><b>작성자로 확인되었습니다.</b>${ctl}</div>
@@ -352,7 +390,7 @@ function renderTeam() {
         <div class="actions"><button class="btn primary" type="submit">변경</button></div></form>` : ""}`;
   } else if (!prd.passwordSet) {
     authorBlock = `<details class="box"><summary><b>이 PRD를 쓰신 선생님이신가요?</b></summary>
-      <p class="hint" style="margin:10px 0">비밀번호를 정하면 팀 만들기를 시작할 수 있습니다. 영문과 숫자를 섞어 6자 이상으로 정하고, 평소 쓰는 비밀번호는 쓰지 마세요. 잊으면 연수 운영진에게 초기화를 요청합니다.</p>
+      <p class="hint" style="margin:10px 0">비밀번호를 정하면 1번 자리의 작성자로 팀 만들기를 시작할 수 있습니다. 영문과 숫자를 섞어 6자 이상으로 정하고, 평소 쓰는 비밀번호는 쓰지 마세요. 잊으면 연수 운영진에게 초기화를 요청합니다.</p>
       <form class="form" data-kind="pw-setup"><div class="row">
         <input class="in" type="password" data-f="pw" placeholder="비밀번호" autocomplete="new-password" aria-label="비밀번호">
         <input class="in" type="password" data-f="pw2" placeholder="비밀번호 확인" autocomplete="new-password" aria-label="비밀번호 확인"></div>
@@ -365,8 +403,9 @@ function renderTeam() {
 
   pane.innerHTML = `
     <h3 class="sec-title">팀 만들기${t.teamName ? ` · ${esc(t.teamName)}` : ""}</h3>
+    <ol class="steps" aria-label="팀 만들기 단계">${steps}</ol>
     <p class="hint">${statusText}</p>
-    <div class="seats">${seats}</div>
+    <div class="seats">${seatHTML.join("")}</div>
     ${applyBlock}${apps}${authorBlock}`;
   restoreDrafts(pane);
 }
@@ -404,13 +443,14 @@ async function teamAct(act, el) {
     case "pick": {
       const uid = el.dataset.uid, a = S.apps.find(x => x.id === uid); if (!a) return;
       const sel = t.members.some(m => m.uid === uid);
-      if (!sel && t.members.length >= t.capacity - 1) { toast(`작성자 포함 ${t.capacity}명이 모두 찼습니다.`); return; }
+      if (!sel && t.members.length >= t.capacity - 1) { toast(`작성자 포함 ${t.capacity}명이 모두 찼습니다. 다른 분을 고르려면 먼저 선정을 취소해 주세요.`); return; }
       const members = sel ? t.members.filter(m => m.uid !== uid) : [...t.members, { uid, org: a.org, name: a.name }];
-      return authorWrite(() => F.updateDoc(ref, { "team.members": members }));
+      return authorWrite(() => F.updateDoc(ref, { "team.members": members }), sel ? `${a.name} 선생님 선정을 취소했습니다.` : `${a.name} 선생님을 ${members.length + 1}번 자리로 선정했습니다.`);
     }
     case "finalize": {
       const left = t.capacity - 1 - t.members.length;
-      if (left > 0 && !confirm(`아직 ${left}자리가 비어 있습니다. 이대로 팀을 확정할까요?`)) return;
+      if (left > 0) { toast(`팀원 ${t.capacity - 1}명을 모두 고른 뒤 확정할 수 있습니다. ${left}명이 남았습니다.`); return; }
+      if (!confirm(`작성자 포함 ${t.capacity}명으로 팀을 확정할까요? 확정하면 새 신청을 받지 않습니다.`)) return;
       return authorWrite(() => F.updateDoc(ref, { "team.status": "finalized", "team.finalizedAt": F.serverTimestamp() }), "팀을 확정했습니다.");
     }
     case "close": return authorWrite(() => F.updateDoc(ref, { "team.status": "closed" }), "모집을 닫았습니다.");
@@ -526,7 +566,7 @@ async function start() {
   }
   F.onSnapshot(F.collection(F.db, "prds"), snap => {
     snap.docs.forEach(d => { S.prd[d.id] = d.data(); });
-    renderCards(); if (S.openId) renderTeam();
+    renderCards(); if (S.openId) { renderTeam(); paintTeamTab(); }
   }, () => {});
   loadCounts();
   if (S.openId) openDoc(S.openId, S.tab);

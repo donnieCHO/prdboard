@@ -59,7 +59,9 @@ service cloud.firestore {
           && t.status in ['closed','open','finalized']
           && t.capacity == resource.data.team.capacity
           && t.members is list && t.members.size() <= t.capacity - 1   // 작성자 자리 1개 제외
-          && (!('teamName' in t) || str(t.teamName, 0, 30));
+          && (!('teamName' in t) || str(t.teamName, 0, 30))
+          // 확정은 작성자 포함 정원이 모두 찼을 때만 (기본 3명 = 작성자 + 선정 2명)
+          && (t.status != 'finalized' || t.members.size() == t.capacity - 1);
       }
 
       allow read: if true;
