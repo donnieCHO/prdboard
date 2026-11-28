@@ -1,5 +1,5 @@
-import * as F from "./fb.js?v=00add4dc";
-import { $, $$, esc, store, timeAgo, toast, goodPassword, ICON } from "./util.js?v=00add4dc";
+import * as F from "./fb.js?v=cf452686";
+import { $, $$, esc, store, timeAgo, toast, goodPassword, ICON } from "./util.js?v=cf452686";
 
 const { enabled, P } = F;
 const PRDS = window.PRDS || [];
@@ -31,8 +31,8 @@ const len = (s, lo, hi) => s.length >= lo && s.length <= hi;
 function teamBtn(id) {
   const t = teamOf(id), n = 1 + t.members.length;
   const st = S.prd[id] ? t.status : "none";
-  const word = { open: "모집 중", finalized: "확정", closed: "", none: "" }[st];
-  const label = { open: "팀 모집 중", finalized: "팀 확정", closed: "팀 모집 전", none: "팀" }[st];
+  const word = { open: "모집 중", finalized: "확정", ended: "마감", closed: "", none: "" }[st];
+  const label = { open: "팀 모집 중", finalized: "팀 확정", ended: "팀 모집 마감", closed: "팀 모집 전", none: "팀" }[st];
   return `<button class="chipbtn team ${st}" data-open="${id}" data-tab="team" aria-label="${label}, ${n}/${t.capacity}명. 팀 구성 보기">${ICON.team}<span>${n}/${t.capacity}</span>${word ? `<em>${word}</em>` : ""}</button>`;
 }
 function likeBtn(id, cls = "") {
@@ -45,7 +45,7 @@ function renderCards() {
     (!S.q || [d.org, d.name, d.title, d.concept, d.feature, d.target_note].join(" ").toLowerCase().includes(S.q)));
   $("#grid").innerHTML = list.length ? list.map(d => `
     <article class="card glass">
-      <div class="top"><span class="org">${esc(d.org)}</span><span class="name">${esc(d.name)}</span><span class="aud ${kind(d.target)}">${audText(d.target)}</span></div>
+      <div class="top"><span class="org">${esc(d.org)}</span><span class="name">${esc(d.name)}</span>${isNew(d) ? '<span class="new" title="새로 추가된 PRD">NEW</span>' : ""}<span class="aud ${kind(d.target)}">${audText(d.target)}</span></div>
       <h2>${esc(d.title)}</h2>
       <dl class="facts">
         <div><dt>컨셉</dt><dd>${esc(d.concept)}</dd></div>
@@ -133,7 +133,7 @@ async function openDoc(id, tab = "doc") {
 async function loadDoc(id) {
   try {
     if (!S.docCache[id]) {
-      const r = await fetch(`docs/${id}.html?v=00add4dc`);
+      const r = await fetch(`docs/${id}.html?v=cf452686`);
       if (!r.ok) throw new Error(r.status);
       S.docCache[id] = await r.text();
     }
@@ -337,6 +337,7 @@ function renderTeam() {
       ? (left ? `신청자 중 ${left}명을 더 고르면 팀을 확정할 수 있습니다.` : "팀원을 모두 골랐습니다. 「팀 확정」을 누르면 팀이 완성됩니다.")
       : `팀원을 모집하고 있습니다. 누구나 신청할 수 있고, 작성자가 신청자 중 ${slots}명을 골라 ${t.capacity}명 팀을 만듭니다.`,
     finalized: `작성자를 포함한 ${1 + t.members.length}명으로 팀 구성이 확정되었습니다.`,
+    ended: author ? "팀 모집을 마감했습니다. 다른 선생님은 신청할 수 없습니다. 「다시 모집하기」로 언제든 다시 열 수 있습니다." : "작성자가 팀 모집을 마감했습니다. 이 PRD는 팀원을 받지 않습니다.",
   }[t.status];
 
   // 신청 영역
@@ -375,9 +376,10 @@ function renderTeam() {
   let authorBlock;
   if (author) {
     const ctl = {
-      closed: `<input class="in" data-f="teamName" data-draft="teamName" maxlength="30" placeholder="팀 이름 (선택)" value="${esc(t.teamName)}" style="flex:1 1 180px" aria-label="팀 이름"><button class="btn primary" data-act="activate">팀 만들기 활성화</button>`,
-      open: `<button class="btn primary" data-act="finalize" ${left ? "disabled" : ""}>팀 확정 (${t.members.length}/${slots}명 선정)</button><button class="btn" data-act="close">모집 닫기</button>`,
+      closed: `<input class="in" data-f="teamName" data-draft="teamName" maxlength="30" placeholder="팀 이름 (선택)" value="${esc(t.teamName)}" style="flex:1 1 180px" aria-label="팀 이름"><button class="btn primary" data-act="activate">팀 만들기 활성화</button><button class="btn" data-act="end">팀 모집 안 받기</button>`,
+      open: `<button class="btn primary" data-act="finalize" ${left ? "disabled" : ""}>팀 확정 (${t.members.length}/${slots}명 선정)</button><button class="btn" data-act="end">모집 마감</button>`,
       finalized: `<button class="btn" data-act="reopen">다시 열기</button>`,
+      ended: `<span class="hint">팀 모집을 마감했습니다.</span><button class="btn" data-act="reopen">다시 모집하기</button>`,
     }[t.status];
     authorBlock = `<div class="author-bar"><b>작성자로 확인되었습니다.</b>${ctl}</div>
       ${S.usedDefault[id] && !S.pwChange ? `<div class="box pw-nudge"><b>휴대전화 뒷자리로 들어오셨습니다.</b> 다른 사람이 짐작할 수 있으니 영문과 숫자를 섞은 비밀번호로 바꿔 주세요. <button class="btn small primary" data-act="pw-toggle">지금 바꾸기</button></div>` : ""}
@@ -408,7 +410,7 @@ function renderTeam() {
 
   pane.innerHTML = `
     <h3 class="sec-title">팀 만들기${t.teamName ? ` · ${esc(t.teamName)}` : ""}</h3>
-    <ol class="steps" aria-label="팀 만들기 단계">${steps}</ol>
+    ${t.status === "ended" ? "" : `<ol class="steps" aria-label="팀 만들기 단계">${steps}</ol>`}
     <p class="hint">${statusText}</p>
     <div class="seats">${seatHTML.join("")}</div>
     ${applyBlock}${apps}${authorBlock}`;
@@ -459,6 +461,9 @@ async function teamAct(act, el) {
       return authorWrite(() => F.updateDoc(ref, { "team.status": "finalized", "team.finalizedAt": F.serverTimestamp() }), "팀을 확정했습니다.");
     }
     case "close": return authorWrite(() => F.updateDoc(ref, { "team.status": "closed" }), "모집을 닫았습니다.");
+    case "end":
+      if (!confirm("팀 모집을 마감할까요?\n다른 선생님은 더 이상 신청할 수 없습니다. 이미 받은 신청은 남아 있고, 나중에 「다시 모집하기」로 열 수 있습니다.")) return;
+      return authorWrite(() => F.updateDoc(ref, { "team.status": "ended" }), "팀 모집을 마감했습니다.");
     case "reopen": return authorWrite(() => F.updateDoc(ref, { "team.status": "open" }), "모집을 다시 열었습니다.");
   }
 }
@@ -559,8 +564,26 @@ function bind() {
 }
 
 /* ---------------- 시작 ---------------- */
+/* ---------------- NEW 딱지: 서버 시간 기준 1일 ----------------
+   추가 시각 = Firestore prds 문서의 createdAt(관리자가 초기 데이터를 만들 때 서버 시각), 없으면 data.py의 added.
+   지금 시각 = 이 사이트를 내려 준 서버(GitHub Pages) 응답의 Date 헤더. 브라우저 시계가 틀려도 영향을 받지 않음. */
+const NEW_MS = 24 * 60 * 60 * 1000;
+function serverNow() { return Date.now() + (S.clockSkew || 0); }
+function addedAt(d) {
+  const c = S.prd[d.id] && S.prd[d.id].createdAt;
+  if (c && c.toMillis) return c.toMillis();
+  return d.added ? Date.parse(d.added) : NaN;
+}
+function isNew(d) { const a = addedAt(d); return !isNaN(a) && serverNow() - a >= -5 * 60 * 1000 && serverNow() - a < NEW_MS; }
+async function syncClock() {
+  try {
+    const r = await fetch(location.pathname + "?t=" + Date.now(), { method: "HEAD", cache: "no-store" });
+    const h = r.headers.get("date"); if (h) { S.clockSkew = Date.parse(h) - Date.now(); renderCards(); }
+  } catch { /* 서버 시각을 못 얻으면 브라우저 시각 사용 */ }
+}
+
 async function start() {
-  bind(); renderCards();
+  bind(); renderCards(); syncClock();
   const hash = location.hash.slice(1);
   if (byId[hash]) openDoc(hash);
   if (!enabled) { $("#offline").hidden = false; return; }

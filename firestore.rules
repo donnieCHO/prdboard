@@ -59,7 +59,7 @@ service cloud.firestore {
       function validTeam() {
         let t = request.resource.data.team;
         return t.keys().hasOnly(['status','capacity','members','teamName','activatedAt','finalizedAt'])
-          && t.status in ['closed','open','finalized']
+          && t.status in ['closed','open','finalized','ended']   // ended = 작성자가 팀 모집을 마감(팀을 만들지 않음)
           && t.capacity == resource.data.team.capacity
           && t.members is list && t.members.size() <= t.capacity - 1   // 작성자 자리 1개 제외
           && (!('teamName' in t) || str(t.teamName, 0, 30))

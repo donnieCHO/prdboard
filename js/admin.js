@@ -1,5 +1,5 @@
-import * as F from "./fb.js?v=00add4dc";
-import { $, $$, esc, timeAgo, toast } from "./util.js?v=00add4dc";
+import * as F from "./fb.js?v=cf452686";
+import { $, $$, esc, timeAgo, toast } from "./util.js?v=cf452686";
 
 const { enabled, P } = F;
 const PRDS = window.PRDS || [];
@@ -16,7 +16,7 @@ function tempPassword() {
 }
 const log = (action, prdId, detail = "") =>
   F.addDoc(P.logs(), { action, prdId, by: user.email || user.uid, at: F.serverTimestamp(), detail }).catch(() => {});
-const teamLabel = { closed: "닫힘", open: "모집 중", finalized: "확정" };
+const teamLabel = { closed: "모집 전", open: "모집 중", finalized: "확정", ended: "마감" };
 
 /* ---------- 로그인 ---------- */
 async function checkAdmin(u) {
@@ -117,7 +117,7 @@ async function seed() {
     for (const p of PRDS) {
       const ref = P.prd(p.id), cur = await F.getDoc(ref);
       if (cur.exists()) await F.updateDoc(ref, { org: p.org, name: p.name, title: p.title });
-      else await F.setDoc(ref, { org: p.org, name: p.name, title: p.title, passwordSet: false,
+      else await F.setDoc(ref, { org: p.org, name: p.name, title: p.title, passwordSet: false, createdAt: F.serverTimestamp(),
         team: { status: "closed", capacity: 3, members: [], teamName: "" } });
     }
     await log("초기 데이터 만들기·갱신", "-"); await loadAll(); toast("초기 데이터를 반영했습니다.");
